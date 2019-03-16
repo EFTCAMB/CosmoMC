@@ -18,7 +18,7 @@ F90C     = ifort
 #use this if mpif90 is trying to use gfortran: MPIF90C = mpif90 -f90=ifort
 
 FFLAGS = -mkl -O3 -no-prec-div -fpp
-DEBUGFLAGS = -mkl -g -check all -check noarg_temp_created -traceback -fpp -fpe0
+DEBUGFLAGS = -mkl -g -fp-stack-check -O0 -check all -check bounds -check uninit -check noarg_temp_created -traceback -fpp -fpe0
 #add -fpe0 to check for floating point errors (think lowLike also throws these harmlessly)
 MODOUT = -module $(OUTPUT_DIR)
 LAPACKL =
@@ -237,7 +237,9 @@ $(PARAMETERIZATION): $(OUTPUT_DIR)/ParamSet.o $(OUTPUT_DIR)/bbn.o  $(OUTPUT_DIR)
 $(OUTPUT_DIR)/Calculator_Cosmology.o: $(OUTPUT_DIR)/CosmoTheory.o
 $(OUTPUT_DIR)/CosmoTheory.o: $(OUTPUT_DIR)/CosmologyTypes.o $(OUTPUT_DIR)/likelihood.o
 $(OUTPUT_DIR)/supernovae.o:  $(OUTPUT_DIR)/Likelihood_Cosmology.o $(SUPERNOVAE)
-$(OUTPUT_DIR)/Calculator_CAMB.o: $(OUTPUT_DIR)/Calculator_Cosmology.o camb
+# EFTCAMB MOD START: remove camb dependency
+$(OUTPUT_DIR)/Calculator_CAMB.o: $(OUTPUT_DIR)/Calculator_Cosmology.o
+# EFTCAMB MOD END.
 $(OUTPUT_DIR)/CosmologyTypes.o: $(OUTPUT_DIR)/settings.o $(OUTPUT_DIR)/likelihood.o $(OUTPUT_DIR)/GeneralTypes.o
 $(OUTPUT_DIR)/Likelihood_Cosmology.o: $(OUTPUT_DIR)/Calculator_Cosmology.o $(OUTPUT_DIR)/CosmoTheory.o
 $(OUTPUT_DIR)/CMBlikes.o: $(OUTPUT_DIR)/Likelihood_Cosmology.o
@@ -285,6 +287,15 @@ export MODOUT
 
 directories:
 	mkdir -p $(OUTPUT_DIR)
+	
+# EFTCosmoMC MOD START: build system
+# get the EFTCosmoMC directory:
+COSMOMC_DIR=$(abspath .)
+EFTCOSMOMC_DIR=$(abspath .)/../EFTsource
+EFTCAMB_DIR=$(abspath .)/../EFTCAMB
+# include EFTCAMB make file:
+include $(EFTCOSMOMC_DIR)/eftcosmomc_build.make
+# EFTCosmoMC MOD END.
 
 $(OUTPUT_DIR)/%.o: %.c
 	$(CC) $(GSLINC) -c $*.c -o $(OUTPUT_DIR)/$*.o

@@ -1,0 +1,6 @@
+# ignore everything:
+*
+# but the gitignore:
+!.gitignore
+# and the generate file:
+!generate.sh

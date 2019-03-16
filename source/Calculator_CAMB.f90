@@ -95,8 +95,14 @@
     P%H0 = CMB%H0
     P%Reion%redshift= CMB%zre
     P%Reion%delta_redshift = CMB%zre_delta
+
+! EFTCosmoMC MOD START: remove ppf if we are using EFTCAMB
+#ifdef STDCAMB
     w_lam = CMB%w
     wa_ppf = CMB%wa
+#endif
+! EFTCosmoMC MOD END.
+
     ALens = CMB%ALens
     ALens_Fiducial = CMB%ALensf
     P%InitialConditionVector(initial_iso_CDM) = &
@@ -117,6 +123,17 @@
 #else
     if (CMB%fdm/=0._mcp) call MpiStop('Compile with CosmoRec to use fdm')
 #endif
+
+    ! EFTCosmoMC MOD START: pass parameters to EFTCAMB
+#ifdef EFTCOSMOMC
+    P%EFTCAMB = CMB%EFTCAMB_parameters
+    ! print feedback:
+    if ( P%EFTCAMB%EFTCAMB_feedback_level > 1 ) then
+        call P%EFTCAMB%EFTCAMB_print_model_feedback()
+    end if
+#endif
+    ! EFTCosmoMC MOD END.
+
     call this%SetCAMBInitPower(P,CMB,1)
 
     end subroutine CAMBCalc_CMBToCAMB
@@ -233,7 +250,9 @@
                 if (CosmoSettings%cl_lmax(i,i)>0) then
                     if (any(Theory%cls(i,i)%Cl(:) < 0 )) then
                         error = 1
-                        call MpiStop('Calculator_CAMB: negative C_l (could edit to silent error here)')
+                        ! EFTCosmoMC MOD START: if the stability check is disabled this is easily obtained...
+                        !call MpiStop('Calculator_CAMB: negative C_l (could edit to silent error here)')
+                        ! EFTCosmoMC MOD END.
                         return
                     end if
                 end if
@@ -311,7 +330,9 @@
         call this%SetPowersFromCAMB(CMB,Theory)
         if (any(Theory%cls(1,1)%Cl(:) < 0 )) then
             error = 1
-            call MpiStop('Calculator_CAMB: negative C_l (could edit to silent error here)')
+            ! EFTCosmoMC MOD START: if the stability check is disabled this is easily obtained...
+            !call MpiStop('Calculator_CAMB: negative C_l (could edit to silent error here)')
+            ! EFTCosmoMC MOD END.
         end if
         do i=1, min(3,CosmoSettings%num_cls)
             if(error/=0) exit
@@ -652,7 +673,14 @@
     integer error
 
     call this%InitCAMB(CMB,error,.false.)
-    CMBToTheta = CosmomcTheta()
+
+    ! EFTCosmoMC MOD START: add the EFTCAMB stability check
+    if ( error /= 0 ) then
+        CMBToTheta = 0._dl
+    else
+        CMBToTheta = CosmomcTheta()
+    end if
+    ! EFTCosmoMC MOD END.
 
     end function CAMBCalc_CMBToTheta
 
@@ -735,8 +763,14 @@
     !P%Transfer%PK_redshifts and P%Transfer%PK_num_redshifts respectively
     !for nonlinear lensing of CMB + LSS compatibility
     Threadnum =num_threads
+
+! EFTCosmoMC MOD STAR: remove ppf if we are using EFTCAMB
+#ifdef STDCAMB
     w_lam = -1
     wa_ppf = 0._dl
+#endif
+! EFTCosmoMC MOD END.
+
     call CAMB_SetDefParams(P)
 
     HighAccuracyDefault = .true.

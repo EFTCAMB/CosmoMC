@@ -10,6 +10,11 @@
     use DataLikelihoodList
     use RandUtils
     use bbn
+
+    ! EFTCosmoMC MOD START: feedback level
+    use ModelParams, only : FeedbackLevel
+    ! EFTCosmoMC MOD END.
+
     implicit none
 
     character(LEN=:), allocatable :: LogFileName,  numstr, fname, rootdir
@@ -98,6 +103,12 @@
     end if
 
     FeedBack = Ini%Read_Int('feedback',0)
+
+    ! EFTCosmoMC MOD START: raise CAMB feedback if needed
+    if ( FeedBack >= 3 ) then
+        FeedbackLevel = FeedBack
+    end if
+    ! EFTCosmoMC MOD END.
 
     call Ini%Read('generic_mcmc',generic_mcmc)
     if (generic_mcmc) then

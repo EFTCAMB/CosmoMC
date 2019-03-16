@@ -13,6 +13,13 @@
     use CosmoTheory
     use Calculator_Cosmology
     use bbn
+
+    ! EFTCosmoMC MOD START: add EFTCosmoMC modules
+#ifdef EFTCOSMOMC
+    use EFT_def
+#endif
+    ! EFTCosmoMC MOD END.
+
     implicit none
     private
 
@@ -60,6 +67,16 @@
     class(TGeneralConfig), target :: Config
     character(LEN=:), pointer :: prior
 
+
+        ! EFTCosmoMC MOD START: add EFTCosmoMC variables
+#ifdef EFTCOSMOMC
+        integer           :: ind, eft_param_num
+        type(TParamNames) :: EFT_Names
+        character(len=EFT_names_max_length)       :: eft_param_name
+        character(len=EFT_names_latex_max_length) :: eft_param_name_latex
+#endif
+        ! EFTCosmoMC MOD END.
+
     call Ini%Read('H0_min',this%H0_min)
     call Ini%Read('H0_max',this%H0_max)
     call Ini%Read('use_min_zre',this%use_min_zre)
@@ -82,8 +99,40 @@
     call Names%AddDerivedRange('zrei', mn=this%use_min_zre)
     call Names%AddDerivedRange('H0', this%H0_min, this%H0_max)
     this%num_derived = Names%num_derived
-    !set number of hard parameters, number of initial power spectrum parameters
-    call this%SetTheoryParameterNumbers(16,last_power_index)
+
+        ! EFTCosmoMC MOD START: (IW) add the EFTCAMB parameter names to Names
+#ifdef STDCAMB
+        !set number of hard parameters, number of initial power spectrum parameters
+        call this%SetTheoryParameterNumbers(16,last_power_index)
+#endif
+#ifdef EFTCOSMOMC
+        ! compute the number of EFTCAMB parameters:
+        if ( allocated( CosmoSettings%EFTCAMB_settings%model ) ) then
+            eft_param_num = CosmoSettings%EFTCAMB_settings%model%parameter_number
+            ! cycle over the parameters:
+            do ind=1, eft_param_num
+
+                call CosmoSettings%EFTCAMB_settings%model%parameter_names( ind, eft_param_name )
+                call CosmoSettings%EFTCAMB_settings%model%parameter_names_latex( ind, eft_param_name_latex )
+
+                call EFT_Names%SetUnnamed(1)
+                EFT_Names%name(1)       = eft_param_name
+                EFT_Names%label(1)      = eft_param_name_latex
+                EFT_Names%comment(1)    = 'EFTCAMB parameter'
+                EFT_Names%is_derived(1) = .False.
+
+                call Names%Add( EFT_Names, check_duplicates=.True. )
+
+            end do
+            ! set the right number of parameters:
+            num_theory_params = num_theory_params +eft_param_num
+            index_data        = index_data +eft_param_num
+            call this%SetTheoryParameterNumbers( 16+eft_param_num, last_power_index )
+        else
+            call this%SetTheoryParameterNumbers( 16, last_power_index )
+        end if
+#endif
+    ! EFTCosmoMC MOD END.
 
     end subroutine TP_Init
 
@@ -152,6 +201,23 @@
             try_t = this%H0_max
             call SetForH(Params,CMB,try_t, .false.)
             D_t = CosmoCalc%CMBToTheta(CMB)
+
+                ! EFTCosmoMC MOD START: add the EFTCAMB stability check
+#ifdef EFTCOSMOMC
+                if ( D_b == 0._dl .and. D_t == 0._dl ) then
+                    ! the model is unstable. Reject the sample.
+                    CMB%H0=0
+                    ! print some optional feedback and then return
+                    if ( CMB%EFTCAMB_parameters%EFTCAMB_feedback_level > 1 ) then
+                        write(*,'(a)') '***************************************************************'
+                        write(*,'(a)') ' EFTCAMB: theory unstable'
+                        write(*,'(a)') '***************************************************************'
+                    end if
+                    return
+                end if
+#endif
+                ! EFTCosmoMC MOD END.
+
             if (DA < D_b .or. DA > D_t) then
                 if (Feedback>1) write(*,*) instance, 'Out of range finding H0: ', real(Params(3))
                 cmb%H0=0 !Reject it
@@ -160,6 +226,20 @@
                 do
                     call SetForH(Params,CMB,(try_b+try_t)/2, .false.)
                     D_try = CosmoCalc%CMBToTheta(CMB)
+
+#ifdef EFTCOSMOMC
+                        if ( D_try == 0._dl ) then
+                            ! the model is unstable. Reject the sample.
+                            CMB%H0=0
+                            ! print some optional feedback and then return
+                            if ( CMB%EFTCAMB_parameters%EFTCAMB_feedback_level > 1 ) then
+                                write(*,'(a)') '***************************************************************'
+                                write(*,'(a)') ' EFTCAMB: theory unstable'
+                                write(*,'(a)') '***************************************************************'
+                            end if
+                            return
+                        end if
+#endif
                     if (D_try < DA) then
                         try_b = (try_b+try_t)/2
                     else
@@ -334,6 +414,18 @@
         CMB%ALens = Params(14)
         CMB%ALensf = Params(15)
         CMB%fdm = Params(16)
+
+            ! EFTCosmoMC MOD START: pass parameters to EFTCAMB
+#ifdef EFTCOSMOMC
+            if ( CosmoSettings%EFTCAMB_settings%EFTflag /= 0 ) then
+                if ( .not. allocated( CMB%EFTCAMB_parameters%model ) ) then
+                    CMB%EFTCAMB_parameters = CosmoSettings%EFTCAMB_settings
+                end if
+                call CMB%EFTCAMB_parameters%model%init_model_parameters( Params(16+last_power_index+1:16+last_power_index+CMB%EFTCAMB_parameters%model%parameter_number) )
+            end if
+#endif
+            ! EFTCosmoMC MOD END.
+
         call SetFast(Params,CMB)
     end if
 

@@ -1,3 +1,12 @@
+# EFTCosmoMC MOD START: build system
+# get the EFTCosmoMC directory:
+COSMOMC_DIR=$(abspath .)
+EFTCOSMOMC_DIR=$(abspath .)/EFTsource
+EFTCAMB_DIR=$(abspath .)/EFTCAMB
+# include EFTCAMB make file:
+include $(EFTCOSMOMC_DIR)/eftcosmomc_main_build.make
+# EFTCosmoMC MOD END.
+
 default: cosmomc
 
 Debug: cosmomc_debug

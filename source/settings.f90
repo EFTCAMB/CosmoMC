@@ -66,7 +66,15 @@
     integer, parameter :: max_likelihood_functions = 50
 
     integer, parameter :: max_data_params = 200
+    ! EFTCosmoMC MOD START: increase the number of theory parameters by 20.
+    ! Not guaranteed to be enough but should suffice for most applications.
+#ifdef STDCAMB
     integer, parameter :: max_theory_params = 50
+#endif
+#ifdef EFTCOSMOMC
+    integer, parameter :: max_theory_params = 70
+#endif
+    ! EFTCosmoMC MOD END.
     integer, parameter :: max_num_params = max_theory_params + max_data_params
 
     !Set to false if using a slow likelihood function so no there's point is treating

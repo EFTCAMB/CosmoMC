@@ -3,6 +3,13 @@
     use likelihood
     use GeneralTypes
     use ObjectLists
+
+    ! EFTCosmoMC MOD START: use the main EFTCAMB module
+#ifdef EFTCOSMOMC
+    use EFTCAMB_main
+#endif
+    ! EFTCosmoMC MOD END.
+
     implicit none
 
     integer, parameter :: derived_age=1, derived_zstar=2, derived_rstar=3, derived_thetastar=4, derived_DAstar = 5, &
@@ -78,6 +85,13 @@
         !e.g. lmax_cl(1,1) is lmax for TT; zero if CL is not used; order is T, E, B, Phi
         real(mcp), dimension(:), allocatable :: power_redshifts
         real(mcp) :: extrap_kmax = 700._mcp !Allow extrapolation to this kmax/h in P(k)
+
+        ! EFTCosmoMC MOD START: add an EFTCAMB to CosmoSettings
+#ifdef EFTCOSMOMC
+        type(EFTCAMB) :: EFTCAMB_settings
+#endif
+        ! EFTCosmoMC MOD END.
+
     contains
     procedure, private :: Initialize_PKSettings
     procedure, private :: Initialize_CMBSettings
@@ -119,6 +133,11 @@
         real(mcp) :: omnuh2_sterile = 0._mcp  !note omnhu2 is the sum of this + standard neutrinos
         real(mcp) :: sum_mnu_standard
         real(mcp) reserved(5)
+        ! EFTCosmoMC MOD START: add an EFTCAMB for cosmological parameters
+#ifdef EFTCOSMOMC
+        type(EFTCAMB) :: EFTCAMB_parameters
+#endif
+        ! EFTCosmoMC MOD END.
     end Type CMBParams
 
     Type, extends(TParameterization) :: TCosmologyParameterization
@@ -136,6 +155,19 @@
     integer i
     class(TDataLikelihood), pointer :: DataLike
 
+        ! EFTCosmoMC MOD START: adjust parameters numbers
+#ifdef EFTCOSMOMC
+        integer  :: eft_param_num
+
+        ! compute the number of EFTCAMB parameters:
+        if ( allocated( CosmoSettings%EFTCAMB_settings%model ) ) then
+            eft_param_num = CosmoSettings%EFTCAMB_settings%model%parameter_number
+        else
+            eft_param_num = 0
+        end if
+#endif
+        ! EFTCosmoMC MOD END.
+
     !Called after this%init
     num_hard = slow_num
     num_initpower = semi_slow_num
@@ -143,6 +175,14 @@
         call MpiStop('SetTheoryParameterNumbers: parameter numbers do not match')
     index_initpower = num_hard+1
     index_semislow = index_initpower
+
+        ! EFTCosmoMC MOD START: adjust init power index
+#ifdef EFTCOSMOMC
+        index_initpower = index_initpower -eft_param_num
+        index_semislow  = index_initpower
+#endif
+        ! EFTCosmoMC MOD END.
+
     if (num_initpower> max_inipower_params) call MpiStop('see CosmologyTypes.f90: num_initpower> max_inipower_params')
 
     do i=1,DataLikelihoods%Count
@@ -166,8 +206,22 @@
 
 
     subroutine TCosmoTheorySettings_ReadParams(this, Ini)
+
+        ! EFTCosmoMC MOD START: use the CAMB ini reader
+#ifdef EFTCOSMOMC
+        use IniFile
+        implicit none
+#endif
+        ! EFTCosmoMC MOD END.
+
     class(TCosmoTheorySettings) this
     class(TSettingIni) :: Ini
+
+        ! EFTCosmoMC MOD START: add some variables
+#ifdef EFTCOSMOMC
+        logical :: bad
+#endif
+        ! EFTCosmoMC MOD END.
 
     this%compute_tensors = Ini%Read_Logical('compute_tensors',.false.)
 
@@ -197,6 +251,36 @@
     call Ini%Read('lmin_computed_cl',this%lmin_computed_cl)
     call Ini%Read('lmin_store_all_cmb',this%lmin_store_all_cmb)
     call Ini%Read('lmax_tensor',this%lmax_tensor)
+
+        ! EFTCosmoMC MOD START: initialize from file.
+        ! This is NOT elegant but untill the INI reader of CAMB does not get updated there is no other way...
+#ifdef EFTCOSMOMC
+        call Ini_Open( Ini%Original_filename, 1, bad )
+        if ( bad ) stop 'Error opening EFTCAMB parameter file'
+
+        ! read the EFTCAMB model selection flags:
+        call this%EFTCAMB_settings%EFTCAMB_init_from_file( DefIni )
+        if ( this%EFTCAMB_settings%EFTFlag /= 0 ) then
+            ! print the EFTCAMB header:
+            call this%EFTCAMB_settings%EFTCAMB_print_CosmoMC_header()
+            ! initialize the output root name:
+            this%EFTCAMB_settings%outroot = TRIM( Ini%Original_filename )
+            ! initialize feedback level:
+            this%EFTCAMB_settings%EFTCAMB_feedback_level = feedback
+            ! allocate model:
+            call this%EFTCAMB_settings%EFTCAMB_allocate_model()
+            ! read the parameters defining the model from file:
+            call this%EFTCAMB_settings%EFTCAMB_read_model_selection( DefIni )
+            ! allocate model functions and parameters:
+            call this%EFTCAMB_settings%EFTCAMB_allocate_model_functions( )
+            ! compute model number of parameters:
+            call this%EFTCAMB_settings%model%compute_param_number()
+            ! print feedback:
+            call this%EFTCAMB_settings%EFTCAMB_print_model_feedback( print_params=.False. ) ! this has to be rewritten too... probably...
+            write(*,'(a)') "***************************************************************"
+        end if
+#endif
+    ! EFTCosmoMC MOD END.
 
     end subroutine TCosmoTheorySettings_ReadParams
 

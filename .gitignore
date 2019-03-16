@@ -1,31 +1,33 @@
-plot_data/
-dist/
-scripts/
-chains/
-*.mod
-*.a
-*.o
-*.sm
-*~
-.metadata
+# ignore the MAC files
+.DS_Store
+
+# ignore the ECLIPSE project file
 .project
 .pydevproject
-.DS_Store
-x64/
-Debug/
-Release/
-DebugMPI/
-ReleaseMPI/
-*.suo
-*.asv
-*.u2d
-*.user
-*.pdb
+
+# ignore compilation products
+*.mod
+*.o
+*.a
+*.pyc
+
+# ignore the link to the planck data library
 data/clik
+
+# ignore executables:
 cosmomc
 cosmomc_debug
-CosmoMC/
+eftcosmomc
+eftcosmomc_debug
+getdist
 
+# ignore cluster scripts:
+*.sbatch
+*.err
+*.out
+
+
+# python:
 *.py[cod]
 *$py.class
 __pycache__/
