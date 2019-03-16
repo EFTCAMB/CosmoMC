@@ -272,7 +272,7 @@
             ! read the parameters defining the model from file:
             call this%EFTCAMB_settings%EFTCAMB_read_model_selection( DefIni )
             ! allocate model functions and parameters:
-            call this%EFTCAMB_settings%EFTCAMB_allocate_model_functions( )
+            call this%EFTCAMB_settings%EFTCAMB_allocate_model_functions( DefIni )
             ! compute model number of parameters:
             call this%EFTCAMB_settings%model%compute_param_number()
             ! print feedback:
